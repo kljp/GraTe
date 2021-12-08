@@ -9,11 +9,20 @@ void process_graph(
 
         std::string file_beg_pos,
         std::string file_adj_list,
+        std::string file_data_train,
         vertex_t INFTY
 )
 {
 
     const vertex_t gpu_id = 0;
+
+    std::ofstream data_train;
+    data_train.open(file_data_train.c_str(), std::ios::out | std::ios::app);
+    if(!data_train.is_open()){
+        std::cout << "File open error." << std::endl;
+        exit(-1);
+    }
+
     graph<vertex_t, index_t, double, vertex_t, index_t, double> *ginst
             = new graph<vertex_t, index_t, double, vertex_t, index_t, double>(file_beg_pos.c_str(), file_adj_list.c_str(), NULL);
     srand((unsigned int) wtime());
@@ -38,8 +47,11 @@ void process_graph(
             ginst->vert_count,
             ginst->edge_count,
             gpu_id,
+            data_train,
             INFTY
     );
+
+    data_train.close();
 
     delete[] src_list;
     delete ginst;
@@ -47,11 +59,12 @@ void process_graph(
 
 int main(int argc, char **argv){
 
-    if(argc < 4){
+    if(argc < 6){
 
         std::cout
                 << "Required argument:\n"
                 << "\t--csr : beg_pos and adj_list of input graph (e.g., --csr com-Orkut.mtx_beg_pos.bin com-Orkut.mtx_adj_list.bin)\n"
+                << "\t--data : filename of train data\n"
                 << "Optional argument:\n"
                 << "\t--verylarge : set data type of vertices and edges to ' unsigned long long' to handle very large input graph (e.g., com-Friendster), default='unsigned int'\n"
                 << "\t--verbose : print breakdown of frontier processing techniques\n"
@@ -62,9 +75,11 @@ int main(int argc, char **argv){
 
     std::string file_beg_pos;
     std::string file_adj_list;
+    std::string file_data_train;
     bool is_verylarge = false;
     bool is_verbose = false;
     bool is_checked_input = false;
+    bool is_checked_data = false;
     bool is_checked_verylarge = false;
     bool is_checked_verbose = false;
 
@@ -74,6 +89,12 @@ int main(int argc, char **argv){
                 file_beg_pos = std::string(argv[i + 1]);
                 file_adj_list = std::string(argv[i + 2]);
                 is_checked_input = true;
+            }
+        }
+        else if(!strcmp(argv[i], "--data") && i != argc - 1){
+            if(!is_checked_data){
+                file_data_train = std::string(argv[i + 1]);
+                is_checked_data = true;
             }
         }
         else if(!strcmp(argv[i], "--verylarge")){
@@ -100,6 +121,7 @@ int main(int argc, char **argv){
         process_graph<unsigned long long, unsigned long long, unsigned int>(
                 file_beg_pos,
                 file_adj_list,
+                file_data_train,
                 ULLONG_MAX
         );
     }
@@ -108,6 +130,7 @@ int main(int argc, char **argv){
         process_graph<unsigned int, unsigned int, unsigned int>(
                 file_beg_pos,
                 file_adj_list,
+                file_data_train,
                 UINT_MAX
         );
     }

@@ -4,7 +4,7 @@
 #include <fstream>
 #include <cstdio>
 #include <climits>
-#include "wtime.h"
+#include "../common/wtime.h"
 
 template <typename data_t>
 void preprocess_graph(

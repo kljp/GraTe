@@ -4,6 +4,7 @@
 #include "../common/comm.cuh"
 #include "../common/fqg.cuh"
 #include "../common/mcpy.cuh"
+#include <fstream>
 
 template<typename vertex_t, typename index_t, typename depth_t>
 void bfs_td(
@@ -364,6 +365,7 @@ int bfs( // breadth-first search on GPU
         index_t vert_count,
         index_t edge_count,
         index_t gpu_id,
+        std::ofstream &data_train,
         vertex_t INFTY
 ){
 

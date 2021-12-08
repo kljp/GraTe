@@ -11,6 +11,7 @@ objs = $(patsubst %.cu,%.o,$(wildcard *.cu))
 
 deps = $(wildcard ./*.cuh) \
 		$(wildcard *.h) \
+		$(wildcard ./../common/*) \
 		Makefile
 
 %.o:%.cu $(deps)
