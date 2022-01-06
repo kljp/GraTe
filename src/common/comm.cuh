@@ -20,7 +20,8 @@
 
 #define WSZ 32 // warp size
 
-#define NUM_ITER 32
+#define NUM_ITER 16
+#define NUM_SIM 4
 #define UNVISITED (unsigned int) (0xFFFFFFFF)
 
 double avg_deg;

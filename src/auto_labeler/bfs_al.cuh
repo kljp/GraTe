@@ -7,6 +7,101 @@
 #include <fstream>
 
 template<typename vertex_t, typename index_t, typename depth_t>
+void alloc_sim(
+
+        index_t vert_count,
+        depth_t* &sa_d_sim,
+        vertex_t* &fq_td_1_d_sim,
+        vertex_t* &fq_td_1_curr_sz_sim,
+        vertex_t* &fq_sz_h_sim,
+        vertex_t* &fq_td_2_d_sim,
+        vertex_t* &fq_td_2_curr_sz_sim,
+        vertex_t* &fq_bu_curr_sz_sim
+){
+
+    H_ERR(cudaMalloc((void **) &sa_d_sim, sizeof(depth_t) * vert_count));
+    H_ERR(cudaMalloc((void **) &fq_td_1_d_sim, sizeof(vertex_t) * vert_count));
+    H_ERR(cudaMalloc((void **) &fq_td_1_curr_sz_sim, sizeof(vertex_t)));
+    H_ERR(cudaMallocHost((void **) &fq_sz_h_sim, sizeof(vertex_t)));
+    H_ERR(cudaMalloc((void **) &fq_td_2_d_sim, sizeof(vertex_t) * vert_count));
+    H_ERR(cudaMalloc((void **) &fq_td_2_curr_sz_sim, sizeof(vertex_t)));
+    H_ERR(cudaMalloc((void **) &fq_bu_curr_sz_sim, sizeof(vertex_t)));
+}
+
+template<typename vertex_t, typename index_t, typename depth_t>
+void dealloc_sim(
+
+        depth_t* &sa_d_sim,
+        vertex_t* &fq_td_1_d_sim,
+        vertex_t* &fq_td_1_curr_sz_sim,
+        vertex_t* &fq_sz_h_sim,
+        vertex_t* &fq_td_2_d_sim,
+        vertex_t* &fq_td_2_curr_sz_sim,
+        vertex_t* &fq_bu_curr_sz_sim
+){
+
+    cudaFree(sa_d_sim);
+    cudaFree(fq_td_1_d_sim);
+    cudaFree(fq_td_1_curr_sz_sim);
+    cudaFree(fq_sz_h_sim);
+    cudaFree(fq_td_2_d_sim);
+    cudaFree(fq_td_2_curr_sz_sim);
+    cudaFree(fq_bu_curr_sz_sim);
+}
+
+template<typename vertex_t, typename index_t, typename depth_t>
+__global__ void mcpy_init_sim(
+
+        index_t vert_count,
+        depth_t *sa_d,
+        depth_t *sa_d_sim,
+        vertex_t *fq_td_1_d,
+        vertex_t *fq_td_1_curr_sz,
+        vertex_t *fq_td_1_d_sim,
+        vertex_t *fq_td_1_curr_sz_sim,
+        vertex_t *fq_td_2_d,
+        vertex_t *fq_td_2_curr_sz,
+        vertex_t *fq_td_2_d_sim,
+        vertex_t *fq_td_2_curr_sz_sim,
+        vertex_t *fq_bu_curr_sz,
+        vertex_t *fq_bu_curr_sz_sim,
+        vertex_t INFTY
+){
+
+    index_t tid_st = threadIdx.x + blockDim.x * blockIdx.x;
+    index_t tid;
+    const index_t grnt = gridDim.x * blockDim.x;
+
+    tid = tid_st;
+    while(tid < vert_count){
+
+        fq_td_1_d_sim[tid] = fq_td_1_d[tid];
+        tid += grnt;
+    }
+
+    tid = tid_st;
+    while(tid < vert_count){
+
+        fq_td_2_d_sim[tid] = fq_td_2_d[tid];
+        tid += grnt;
+    }
+
+    tid = tid_st;
+    while(tid < vert_count){
+
+        sa_d_sim[tid] = sa_d[tid];
+        tid += grnt;
+    }
+
+    if(tid_st == 0){
+
+        *fq_td_1_curr_sz_sim = *fq_td_1_curr_sz;
+        *fq_td_2_curr_sz_sim = *fq_td_2_curr_sz;
+        *fq_bu_curr_sz_sim = *fq_bu_curr_sz;
+    }
+}
+
+template<typename vertex_t, typename index_t, typename depth_t>
 void bfs_td(
 
         depth_t *sa_d,
@@ -167,18 +262,258 @@ void bfs_tdbu(
         vertex_t *fq_td_2_d,
         vertex_t *fq_td_2_curr_sz,
         vertex_t *fq_bu_curr_sz,
-        vertex_t INFTY
+        vertex_t INFTY,
+        depth_t *sa_d_sim,
+        vertex_t *fq_td_1_d_sim,
+        vertex_t *fq_td_1_curr_sz_sim,
+        vertex_t *fq_sz_h_sim,
+        vertex_t *fq_td_2_d_sim,
+        vertex_t *fq_td_2_curr_sz_sim,
+        vertex_t *fq_bu_curr_sz_sim
 ){
 
     bool fq_swap = true;
     bool reversed = false;
-    bool TD_BU = false; // true: top-down, false: bottom-up
+    bool TD_BU = false; // true: bottom-up, false: top-down
+
+    bool fq_swap_sim;
+    bool reversed_sim;
+    bool TD_BU_sim;
 
     *fq_sz_h = 1;
+    flush_fq<vertex_t, index_t, depth_t>
+    <<<1, 1>>>(
+
+            fq_bu_curr_sz
+    );
+    cudaDeviceSynchronize();
+
+    double t_st, t_end, t_acc, t_avg_td, t_avg_bu;
 
     for(level = 0; ; level++){
 
-        if(*fq_sz_h < (vertex_t) (par_alpha * vert_count)){
+        if(level == 0){
+            TD_BU_sim = false;
+            H_ERR(cudaMemcpy(fq_sz_h_sim, fq_sz_h, sizeof(vertex_t), cudaMemcpyHostToHost));
+        }
+        else{
+
+            for(int i = 0; i < 2; i++){
+
+                TD_BU_sim = (bool) i;
+                t_acc = 0.0;
+
+                for(int j = 0; j < NUM_SIM; j++){
+
+                    // 1. Initialize simulation data structures
+                    H_ERR(cudaMemcpy(fq_sz_h_sim, fq_sz_h, sizeof(vertex_t), cudaMemcpyHostToHost));
+                    fq_swap_sim = fq_swap;
+                    reversed_sim = reversed;
+                    mcpy_init_sim<vertex_t, index_t, depth_t>
+                    <<<BLKS_NUM_INIT_RT, THDS_NUM_INIT_RT>>>(
+
+                            vert_count,
+                            sa_d,
+                            sa_d_sim,
+                            fq_td_1_d,
+                            fq_td_1_curr_sz,
+                            fq_td_1_d_sim,
+                            fq_td_1_curr_sz_sim,
+                            fq_td_2_d,
+                            fq_td_2_curr_sz,
+                            fq_td_2_d_sim,
+                            fq_td_2_curr_sz_sim,
+                            fq_bu_curr_sz,
+                            fq_bu_curr_sz_sim,
+                            INFTY
+                    );
+                    cudaDeviceSynchronize();
+
+                    // 2. Simulate traversal and evaluate runtime
+                    t_st = wtime();
+
+                    if(!TD_BU_sim){
+
+                        if(!fq_swap_sim)
+                            fq_swap_sim = true;
+                        else
+                            fq_swap_sim = false;
+
+                        if(level != 0){
+
+                            if(!reversed_sim){
+
+                                if(!fq_swap_sim){
+
+                                    mcpy_init_fq_td<vertex_t, index_t, depth_t>
+                                    <<<BLKS_NUM_INIT_RT, THDS_NUM_INIT_RT>>>(
+
+                                            vert_count,
+                                            temp_fq_td_d,
+                                            temp_fq_curr_sz,
+                                            fq_td_2_d_sim,
+                                            fq_td_2_curr_sz_sim,
+                                            INFTY
+                                    );
+                                }
+
+                                else{
+
+                                    if(level == 1){
+
+                                        init_fqg_2<vertex_t, index_t, depth_t>
+                                        <<<1, 1>>>(
+
+                                                fq_td_1_d_sim,
+                                                fq_td_1_curr_sz_sim,
+                                                INFTY
+                                        );
+                                    }
+
+                                    else{
+
+                                        mcpy_init_fq_td<vertex_t, index_t, depth_t>
+                                        <<<BLKS_NUM_INIT_RT, THDS_NUM_INIT_RT>>>(
+
+                                                vert_count,
+                                                temp_fq_td_d,
+                                                temp_fq_curr_sz,
+                                                fq_td_1_d_sim,
+                                                fq_td_1_curr_sz_sim,
+                                                INFTY
+                                        );
+                                    }
+                                }
+                            }
+
+                            else{
+
+                                reversed_sim = false;
+                                fq_swap_sim = false;
+
+                                mcpy_init_fq_td<vertex_t, index_t, depth_t>
+                                <<<BLKS_NUM_INIT_RT, THDS_NUM_INIT_RT>>>(
+
+                                        vert_count,
+                                        temp_fq_td_d,
+                                        temp_fq_curr_sz,
+                                        fq_td_2_d_sim,
+                                        fq_td_2_curr_sz_sim,
+                                        INFTY
+                                );
+
+                                mcpy_init_fq_td<vertex_t, index_t, depth_t>
+                                <<<BLKS_NUM_INIT_RT, THDS_NUM_INIT_RT>>>(
+
+                                        vert_count,
+                                        temp_fq_td_d,
+                                        temp_fq_curr_sz,
+                                        fq_td_1_d_sim,
+                                        fq_td_1_curr_sz_sim,
+                                        INFTY
+                                );
+                                cudaDeviceSynchronize();
+
+                                bfs_rev<vertex_t, index_t, depth_t>(
+
+                                        sa_d_sim,
+                                        vert_count,
+                                        level,
+                                        fq_sz_h_sim,
+                                        fq_td_1_d_sim,
+                                        fq_td_1_curr_sz_sim
+                                );
+                            }
+                        }
+
+                        cudaDeviceSynchronize();
+
+                        if(!fq_swap_sim){
+
+                            bfs_td<vertex_t, index_t, depth_t>(
+
+                                    sa_d_sim,
+                                    adj_list_d,
+                                    offset_d,
+                                    adj_deg_d,
+                                    vert_count,
+                                    level,
+                                    fq_td_1_d_sim,
+                                    fq_td_1_curr_sz_sim,
+                                    fq_sz_h_sim,
+                                    fq_td_2_d_sim,
+                                    fq_td_2_curr_sz_sim
+                            );
+                        }
+
+                        else{
+
+                            bfs_td<vertex_t, index_t, depth_t>(
+
+                                    sa_d_sim,
+                                    adj_list_d,
+                                    offset_d,
+                                    adj_deg_d,
+                                    vert_count,
+                                    level,
+                                    fq_td_2_d_sim,
+                                    fq_td_2_curr_sz_sim,
+                                    fq_sz_h_sim,
+                                    fq_td_1_d_sim,
+                                    fq_td_1_curr_sz_sim
+                            );
+                        }
+
+                        cudaDeviceSynchronize();
+                    }
+                    else{
+
+                        flush_fq<vertex_t, index_t, depth_t>
+                        <<<1, 1>>>(
+
+                                fq_bu_curr_sz_sim
+                        );
+                        cudaDeviceSynchronize();
+
+                        bfs_bu<vertex_t, index_t, depth_t>(
+
+                                sa_d_sim,
+                                adj_list_d,
+                                offset_d,
+                                adj_deg_d,
+                                vert_count,
+                                level,
+                                fq_sz_h_sim,
+                                fq_bu_curr_sz_sim
+                        );
+                        cudaDeviceSynchronize();
+                    }
+
+                    t_end = wtime();
+
+                    // 3. Accumulate runtime
+                    t_acc += (t_end - t_st);
+                }
+
+                // 4. Assign avg_runtime
+                if(!TD_BU_sim)
+                    t_avg_td = t_acc;
+                else
+                    t_avg_bu = t_acc;
+            }
+
+
+            // 5. Select the proper direction by average runtime
+            if(t_avg_td <= t_avg_bu)
+                TD_BU_sim = false;
+            else
+                TD_BU_sim = true;
+        }
+
+        // 6. Generate train_data
+
+        // 7. Assign direction to TD_BU
+        if(!TD_BU_sim){
 
             if(TD_BU)
                 reversed = true;
@@ -189,7 +524,7 @@ void bfs_tdbu(
         else
             TD_BU = true;
 
-
+        // 9. Actual traversal
         if(!TD_BU){
 
             if(!fq_swap)
@@ -347,11 +682,8 @@ void bfs_tdbu(
             cudaDeviceSynchronize();
         }
 
-        if(!TD_BU){
-
-            if(*fq_sz_h == 0)
-                break;
-        }
+        if(*fq_sz_h == 0)
+            break;
     }
 }
 
@@ -392,6 +724,15 @@ int bfs( // breadth-first search on GPU
     vertex_t *fq_sz_h;
     vertex_t *fq_bu_curr_sz; // used for the number of vertices examined at each level, the size must be 1
 
+    // sim_data_structures
+    depth_t *sa_d_sim;
+    vertex_t *fq_td_1_d_sim;
+    vertex_t *fq_td_1_curr_sz_sim;
+    vertex_t *fq_sz_h_sim;
+    vertex_t *fq_td_2_d_sim;
+    vertex_t *fq_td_2_curr_sz_sim;
+    vertex_t *fq_bu_curr_sz_sim;
+
     alloc<vertex_t, index_t, depth_t>::
     alloc_mem(
 
@@ -414,6 +755,18 @@ int bfs( // breadth-first search on GPU
             fq_td_2_d,
             fq_td_2_curr_sz,
             fq_bu_curr_sz
+    );
+
+    alloc_sim<vertex_t, index_t, depth_t>(
+
+            vert_count,
+            sa_d_sim,
+            fq_td_1_d_sim,
+            fq_td_1_curr_sz_sim,
+            fq_sz_h_sim,
+            fq_td_2_d_sim,
+            fq_td_2_curr_sz_sim,
+            fq_bu_curr_sz_sim
     );
 
     mcpy_init_temp<vertex_t, index_t, depth_t>
@@ -515,7 +868,14 @@ int bfs( // breadth-first search on GPU
                 fq_td_2_d,
                 fq_td_2_curr_sz,
                 fq_bu_curr_sz,
-                INFTY
+                INFTY,
+                sa_d_sim,
+                fq_td_1_d_sim,
+                fq_td_1_curr_sz_sim,
+                fq_sz_h_sim,
+                fq_td_2_d_sim,
+                fq_td_2_curr_sz_sim,
+                fq_bu_curr_sz_sim
         );
 
         t_end = wtime();
@@ -642,6 +1002,17 @@ int bfs( // breadth-first search on GPU
             fq_td_2_d,
             fq_td_2_curr_sz,
             fq_bu_curr_sz
+    );
+
+    dealloc_sim<vertex_t, index_t, depth_t>(
+
+            sa_d_sim,
+            fq_td_1_d_sim,
+            fq_td_1_curr_sz_sim,
+            fq_sz_h_sim,
+            fq_td_2_d_sim,
+            fq_td_2_curr_sz_sim,
+            fq_bu_curr_sz_sim
     );
 
     std::cout << "GPU BFS finished" << std::endl;
