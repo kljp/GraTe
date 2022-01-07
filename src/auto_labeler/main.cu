@@ -67,7 +67,6 @@ int main(int argc, char **argv){
                 << "\t--data : filename of train data\n"
                 << "Optional argument:\n"
                 << "\t--verylarge : set data type of vertices and edges to ' unsigned long long' to handle very large input graph (e.g., com-Friendster), default='unsigned int'\n"
-                << "\t--verbose : print breakdown of frontier processing techniques\n"
                 << std::endl;
 
         exit(-1);
@@ -77,11 +76,9 @@ int main(int argc, char **argv){
     std::string file_adj_list;
     std::string file_data_train;
     bool is_verylarge = false;
-    bool is_verbose = false;
     bool is_checked_input = false;
     bool is_checked_data = false;
     bool is_checked_verylarge = false;
-    bool is_checked_verbose = false;
 
     for(int i = 1; i < argc; i++){
         if(!strcmp(argv[i], "--csr") && i != argc - 1 && i != argc - 2){
@@ -103,18 +100,7 @@ int main(int argc, char **argv){
                 is_checked_verylarge = true;
             }
         }
-        else if(!strcmp(argv[i], "--verbose")){
-            if(!is_checked_verbose){
-                is_verbose = true;
-                is_checked_verbose = true;
-            }
-        }
     }
-
-    if(is_verbose)
-        verbose = true;
-    else
-        verbose = false;
 
     if(is_verylarge){
         std::cout << "Data type='unsigned long long'" << std::endl;

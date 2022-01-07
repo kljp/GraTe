@@ -19,6 +19,8 @@ void alloc_sim(
         vertex_t* &fq_bu_curr_sz_sim
 ){
 
+    long gpu_bytes = 0;
+
     H_ERR(cudaMalloc((void **) &sa_d_sim, sizeof(depth_t) * vert_count));
     H_ERR(cudaMalloc((void **) &fq_td_1_d_sim, sizeof(vertex_t) * vert_count));
     H_ERR(cudaMalloc((void **) &fq_td_1_curr_sz_sim, sizeof(vertex_t)));
@@ -26,6 +28,9 @@ void alloc_sim(
     H_ERR(cudaMalloc((void **) &fq_td_2_d_sim, sizeof(vertex_t) * vert_count));
     H_ERR(cudaMalloc((void **) &fq_td_2_curr_sz_sim, sizeof(vertex_t)));
     H_ERR(cudaMalloc((void **) &fq_bu_curr_sz_sim, sizeof(vertex_t)));
+
+    gpu_bytes = sizeof(depth_t) * vert_count + sizeof(vertex_t) * (vert_count * 2 + 3);
+    std::cout << "Additional GPU mem for simulation: " << gpu_bytes << std::endl;
 }
 
 template<typename vertex_t, typename index_t, typename depth_t>
@@ -64,8 +69,7 @@ __global__ void mcpy_init_sim(
         vertex_t *fq_td_2_d_sim,
         vertex_t *fq_td_2_curr_sz_sim,
         vertex_t *fq_bu_curr_sz,
-        vertex_t *fq_bu_curr_sz_sim,
-        vertex_t INFTY
+        vertex_t *fq_bu_curr_sz_sim
 ){
 
     index_t tid_st = threadIdx.x + blockDim.x * blockIdx.x;
@@ -117,12 +121,8 @@ void bfs_td(
         vertex_t *fq_td_out_curr_sz
 ){
 
-    double t_st;
-
     if(*fq_sz_h < (vertex_t) (par_beta * vert_count)){
 
-        if(verbose)
-            t_st = wtime();
         fqg_td_wccao<vertex_t, index_t, depth_t> // warp-cooperative chained atomic operations
         <<<BLKS_NUM_TD_WCCAO, THDS_NUM_TD_WCCAO>>>(
 
@@ -137,14 +137,10 @@ void bfs_td(
                 fq_td_out_curr_sz
         );
         cudaDeviceSynchronize();
-        if(verbose)
-            t_fqg_td_wccao += (wtime() - t_st);
     }
 
     else{
 
-        if(verbose)
-            t_st = wtime();
         fqg_td_wcsac<vertex_t, index_t, depth_t> // warp-cooperative status array check
         <<<BLKS_NUM_TD_WCSAC, THDS_NUM_TD_WCSAC>>>(
 
@@ -157,11 +153,7 @@ void bfs_td(
                 fq_td_in_curr_sz
         );
         cudaDeviceSynchronize();
-        if(verbose)
-            t_fqg_td_wcsac += (wtime() - t_st);
 
-        if(verbose)
-            t_st = wtime();
         fqg_td_tcfe<vertex_t, index_t, depth_t> // thread-centric frontier enqueue
         <<<BLKS_NUM_TD_TCFE, THDS_NUM_TD_TCFE>>>(
 
@@ -172,8 +164,6 @@ void bfs_td(
                 fq_td_out_curr_sz
         );
         cudaDeviceSynchronize();
-        if(verbose)
-            t_fqg_td_tcfe += (wtime() - t_st);
     }
 
     H_ERR(cudaMemcpy(fq_sz_h, fq_td_out_curr_sz, sizeof(vertex_t), cudaMemcpyDeviceToHost));
@@ -192,10 +182,6 @@ void bfs_bu(
         vertex_t *fq_bu_curr_sz
 ){
 
-    double t_st;
-
-    if(verbose)
-        t_st = wtime();
     fqg_bu_wcsac<vertex_t, index_t, depth_t>
     <<<BLKS_NUM_BU_WCSA, THDS_NUM_BU_WCSA>>>(
 
@@ -208,8 +194,6 @@ void bfs_bu(
             fq_bu_curr_sz
     );
     cudaDeviceSynchronize();
-    if(verbose)
-        t_fqg_bu_wcsac += (wtime() - t_st);
 
     H_ERR(cudaMemcpy(fq_sz_h, fq_bu_curr_sz, sizeof(vertex_t), cudaMemcpyDeviceToHost));
 }
@@ -225,10 +209,6 @@ void bfs_rev(
         vertex_t *fq_td_in_curr_sz
 ){
 
-    double t_st;
-
-    if(verbose)
-        t_st = wtime();
     fqg_rev_tcfe<vertex_t, index_t, depth_t> // thread-centric frontier enqueue
     <<<BLKS_NUM_REV_TCFE, THDS_NUM_REV_TCFE>>>(
 
@@ -239,8 +219,6 @@ void bfs_rev(
             fq_td_in_curr_sz
     );
     cudaDeviceSynchronize();
-    if(verbose)
-        t_fqg_rev_tcfe += (wtime() - t_st);
 
     H_ERR(cudaMemcpy(fq_sz_h, fq_td_in_curr_sz, sizeof(vertex_t), cudaMemcpyDeviceToHost));
 }
@@ -269,8 +247,18 @@ void bfs_tdbu(
         vertex_t *fq_sz_h_sim,
         vertex_t *fq_td_2_d_sim,
         vertex_t *fq_td_2_curr_sz_sim,
-        vertex_t *fq_bu_curr_sz_sim
+        vertex_t *fq_bu_curr_sz_sim,
+        std::ofstream &data_train
 ){
+
+    vertex_t prev_fq_sz = 0;
+    vertex_t curr_fq_sz = 0;
+    vertex_t unvisited = (vertex_t) vert_count;
+    double prev_slope = 0.0;
+    double curr_slope = 0.0; // slope (variation)
+    double curr_conv = 0.0; // convexity (tendency)
+    double curr_proc = 0.0; // processed (progress)
+    double remn_proc = 0.0;
 
     bool fq_swap = true;
     bool reversed = false;
@@ -288,7 +276,7 @@ void bfs_tdbu(
     );
     cudaDeviceSynchronize();
 
-    double t_st, t_end, t_acc, t_avg_td, t_avg_bu;
+    double t_st, t_end, t_acc, t_avg_td, t_avg_bu, t_st_rev, t_end_rev;
 
     for(level = 0; ; level++){
 
@@ -305,10 +293,18 @@ void bfs_tdbu(
 
                 for(int j = 0; j < NUM_SIM; j++){
 
+                    t_st_rev = 0;
+                    t_end_rev = 0;
+
                     // 1. Initialize simulation data structures
                     H_ERR(cudaMemcpy(fq_sz_h_sim, fq_sz_h, sizeof(vertex_t), cudaMemcpyHostToHost));
                     fq_swap_sim = fq_swap;
-                    reversed_sim = reversed;
+
+                    if(TD_BU && !TD_BU_sim)
+                        reversed_sim = true;
+                    else
+                        reversed_sim = false;
+
                     mcpy_init_sim<vertex_t, index_t, depth_t>
                     <<<BLKS_NUM_INIT_RT, THDS_NUM_INIT_RT>>>(
 
@@ -324,8 +320,7 @@ void bfs_tdbu(
                             fq_td_2_d_sim,
                             fq_td_2_curr_sz_sim,
                             fq_bu_curr_sz,
-                            fq_bu_curr_sz_sim,
-                            INFTY
+                            fq_bu_curr_sz_sim
                     );
                     cudaDeviceSynchronize();
 
@@ -384,9 +379,12 @@ void bfs_tdbu(
                                         );
                                     }
                                 }
+                                cudaDeviceSynchronize();
                             }
 
                             else{
+
+                                t_st_rev = wtime();
 
                                 reversed_sim = false;
                                 fq_swap_sim = false;
@@ -423,10 +421,11 @@ void bfs_tdbu(
                                         fq_td_1_d_sim,
                                         fq_td_1_curr_sz_sim
                                 );
+                                cudaDeviceSynchronize();
+                                t_end_rev = wtime();
+//                                std::cout << "rev = " << t_end_rev - t_st_rev << std::endl;
                             }
                         }
-
-                        cudaDeviceSynchronize();
 
                         if(!fq_swap_sim){
 
@@ -492,7 +491,7 @@ void bfs_tdbu(
                     t_end = wtime();
 
                     // 3. Accumulate runtime
-                    t_acc += (t_end - t_st);
+                    t_acc += (t_end - t_st) - (t_st_rev - t_end_rev);
                 }
 
                 // 4. Assign avg_runtime
@@ -511,6 +510,33 @@ void bfs_tdbu(
         }
 
         // 6. Generate train_data
+        if(level == 0){
+            prev_fq_sz = 0;
+            prev_slope = 0.0;
+        }
+        else{
+            prev_fq_sz = curr_fq_sz;
+            prev_slope = curr_slope;
+        }
+
+        curr_fq_sz = *fq_sz_h;
+        curr_slope = (double) (curr_fq_sz - prev_fq_sz) / vert_count;
+        curr_conv = curr_slope - prev_slope;
+
+        unvisited -= curr_fq_sz;
+        curr_proc = (double) curr_fq_sz / vert_count;
+        remn_proc = (double) unvisited / vert_count;
+
+        // Input features
+        data_train << avg_deg << ",";
+        data_train << prob_high << ",";
+        data_train << curr_slope << ",";
+        data_train << curr_conv << ",";
+        data_train << curr_proc << ",";
+        data_train << remn_proc << ",";
+        // Label
+        data_train << TD_BU_sim << std::endl;
+        num_data++;
 
         // 7. Assign direction to TD_BU
         if(!TD_BU_sim){
@@ -780,14 +806,6 @@ int bfs( // breadth-first search on GPU
     cudaDeviceSynchronize();
 
     depth_t level;
-    double avg_prob_high = 0.0;
-    double avg_depth = 0.0;
-    double avg_par_alpha = 0.0;
-    double avg_par_beta = 0.0;
-    double t_st, t_end, t_elpd, avg_t; // time_start, time_end, time_elapsed
-    double t_par_st, t_par_end, t_par_elpd, avg_t_par; // time_calc_par_opt_start, time_calc_par_opt_end, time_calc_par_opt_elapsed
-    double avg_gteps = 0.0; // average_teps (traversed edges per second)
-    double curr_gteps; // current_teps
 
     warm_up_gpu<<<BLKS_NUM_INIT, THDS_NUM_INIT>>>();
     cudaDeviceSynchronize();
@@ -841,16 +859,12 @@ int bfs( // breadth-first search on GPU
 //        std::cout << "Started from " << src_list[i] << std::endl;
         }
 
-        t_st = wtime();
-
-        t_par_st = wtime();
         calc_par_opt<vertex_t, index_t>(
 
                 adj_deg_h,
                 vert_count,
                 edge_count
         );
-        t_par_end = wtime();
 
         bfs_tdbu<vertex_t, index_t, depth_t>(
 
@@ -875,10 +889,9 @@ int bfs( // breadth-first search on GPU
                 fq_sz_h_sim,
                 fq_td_2_d_sim,
                 fq_td_2_curr_sz_sim,
-                fq_bu_curr_sz_sim
+                fq_bu_curr_sz_sim,
+                data_train
         );
-
-        t_end = wtime();
 
         // for validation
         index_t tr_vert = 0;
@@ -907,80 +920,11 @@ int bfs( // breadth-first search on GPU
         std::cout << "Started from " << src_list[i] << std::endl;
         std::cout << "The number of traversed vertices: " << tr_vert << std::endl;
         std::cout << "The number of traversed edges: " << tr_edge << std::endl;
-        avg_prob_high += prob_high;
-        avg_depth += level;
-        if(verbose){
-            avg_par_alpha += par_alpha;
-            avg_par_beta += par_beta;
-        }
-        t_elpd = t_end - t_st;
-        avg_t += t_elpd;
-        t_par_elpd = (t_par_end - t_par_st) * 1000000.0;
-        avg_t_par += t_par_elpd;
-        curr_gteps = (double) (tr_edge / t_elpd) / 1000000000;
-        avg_gteps += curr_gteps;
-        std::cout << "The probability of high-degree vertex: " << prob_high << std::endl;
         std::cout << "Depth: " << level << std::endl;
-        std::cout << "Overhead of direction-optimizer: " << t_par_elpd << "us" << std::endl;
-        std::cout << "Consumed time: " << t_elpd << "s" << std::endl;
-        std::cout << "Current GTEPS: " << curr_gteps << std::endl;
     }
 
-    avg_prob_high /= NUM_ITER;
-    avg_depth /= NUM_ITER;
-    avg_t_par /= NUM_ITER;
-    avg_t /= NUM_ITER;
-    avg_gteps /= NUM_ITER;
-    std::cout << "===================================================================" << std::endl;
-    std::cout << "Summary of BFS" << std::endl;
-    std::cout << "===================================================================" << std::endl;
-    std::cout << "Average degree: " << avg_deg << std::endl;
-    std::cout << "Average probability of high-degree vertex: " << avg_prob_high << std::endl;
-    std::cout << "Average depth: " << avg_depth << std::endl;
-    std::cout << "Average overhead of direction-optimizer: " << avg_t_par << "us" << std::endl;
-    std::cout << "Average consumed time: " << avg_t << "s" << std::endl;
-    std::cout << "Average GTEPS: " << avg_gteps << std::endl;
-    std::cout << "===================================================================" << std::endl;
-    if(verbose){
-
-        t_fqg_td_wccao = (t_fqg_td_wccao * 1000000.0) / NUM_ITER;
-        t_fqg_td_wcsac = (t_fqg_td_wcsac * 1000000.0) / NUM_ITER;
-        t_fqg_td_tcfe = (t_fqg_td_tcfe * 1000000.0) / NUM_ITER;
-        t_fqg_bu_wcsac = (t_fqg_bu_wcsac * 1000000.0) / NUM_ITER;
-        t_fqg_rev_tcfe = (t_fqg_rev_tcfe * 1000000.0) / NUM_ITER;
-
-        double t_wcfp_small = 0.0;
-        double t_wcfp_medium = 0.0;
-        double t_wcfp_large = 0.0;
-        double t_wcfp_total = 0.0;
-        t_wcfp_small = t_fqg_td_wccao;
-        t_wcfp_medium = t_fqg_td_wcsac + t_fqg_td_tcfe;
-        t_wcfp_large = t_fqg_bu_wcsac + t_fqg_rev_tcfe;
-        t_wcfp_total = t_wcfp_small + t_wcfp_medium + t_wcfp_large;
-
-        avg_par_alpha /= NUM_ITER;
-        avg_par_beta /= NUM_ITER;
-
-        std::cout << "Breakdown of kernel execution of frontier processing techniques" << std::endl;
-        std::cout << "===================================================================" << std::endl;
-        std::cout << "fqg_td_wccao: " << t_fqg_td_wccao << "us (" << t_fqg_td_wccao * 100 / t_wcfp_total << "%)" << std::endl;
-        std::cout << "fqg_td_wcsac: " << t_fqg_td_wcsac << "us (" << t_fqg_td_wcsac * 100 / t_wcfp_total << "%)" << std::endl;
-        std::cout << "fqg_td_tcfe: " << t_fqg_td_tcfe << "us (" << t_fqg_td_tcfe * 100 / t_wcfp_total << "%)" << std::endl;
-        std::cout << "fqg_bu_wcsac " << t_fqg_bu_wcsac << "us (" << t_fqg_bu_wcsac * 100 / t_wcfp_total << "%)" << std::endl;
-        std::cout << "fqg_rev_tcfe: " << t_fqg_rev_tcfe << "us (" << t_fqg_rev_tcfe * 100 / t_wcfp_total << "%)" << std::endl;
-        std::cout << "-------------------------------------------------------------------" << std::endl;
-        std::cout << "WCFP_SMALL: " << t_wcfp_small << "us (" << t_wcfp_small * 100 / t_wcfp_total << "%)" << std::endl;
-        std::cout << "WCFP_MEDIUM: " << t_wcfp_medium << "us (" << t_wcfp_medium * 100 / t_wcfp_total << "%)" << std::endl;
-        std::cout << "WCFP_LARGE: " << t_wcfp_large << "us (" << t_wcfp_large * 100 / t_wcfp_total << "%)" << std::endl;
-        std::cout << "-------------------------------------------------------------------" << std::endl;
-        std::cout << "Top-down: " << t_wcfp_small + t_wcfp_medium << "us (" << (t_wcfp_small + t_wcfp_medium) * 100 / t_wcfp_total << "%)" << std::endl;
-        std::cout << "Bottom-up: " << t_wcfp_large << "us (" << t_wcfp_large * 100 / t_wcfp_total << "%)" << std::endl;
-        std::cout << "===================================================================" << std::endl;
-        std::cout << "Parameters (average)" << std::endl;
-        std::cout << "alpha: " << avg_par_alpha << std::endl;
-        std::cout << "beta: " << avg_par_beta << std::endl;
-        std::cout << "===================================================================" << std::endl;
-    }
+    std::cout << "===========================================================" << std::endl;
+    std::cout << "Newly generated data: " << num_data <<std::endl;
 
     ///// iteration ends ///////////////////////////////////////////////////////////////////////////////////////////////
 
