@@ -4,7 +4,7 @@
 #include "../common/comm.cuh"
 #include "../common/fqg.cuh"
 #include "../common/mcpy.cuh"
-#include "model.cuh"
+#include "model.h"
 
 template<typename vertex_t, typename index_t, typename depth_t>
 void bfs_td(
@@ -230,7 +230,7 @@ void bfs_tdbu(
 
         else
             TD_BU = true;
-        
+
         if(!TD_BU){
 
             if(!fq_swap)
