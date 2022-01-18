@@ -230,8 +230,7 @@ void bfs_tdbu(
 
         else
             TD_BU = true;
-
-        std::cout << TD_BU << std::endl;
+        
         if(!TD_BU){
 
             if(!fq_swap)
