@@ -423,7 +423,6 @@ void bfs_tdbu(
                                 );
                                 cudaDeviceSynchronize();
                                 t_end_rev = wtime();
-//                                std::cout << "rev = " << t_end_rev - t_st_rev << std::endl;
                             }
                         }
 
@@ -491,7 +490,7 @@ void bfs_tdbu(
                     t_end = wtime();
 
                     // 3. Accumulate runtime
-                    t_acc += (t_end - t_st) - (t_st_rev - t_end_rev);
+                    t_acc += (t_end - t_st) - (t_end_rev - t_st_rev);
                 }
 
                 // 4. Assign avg_runtime
@@ -500,7 +499,6 @@ void bfs_tdbu(
                 else
                     t_avg_bu = t_acc;
             }
-
 
             // 5. Select the proper direction by average runtime
             if(t_avg_td <= t_avg_bu)

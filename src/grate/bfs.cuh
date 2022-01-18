@@ -4,6 +4,7 @@
 #include "../common/comm.cuh"
 #include "../common/fqg.cuh"
 #include "../common/mcpy.cuh"
+#include "model.cuh"
 
 template<typename vertex_t, typename index_t, typename depth_t>
 void bfs_td(
@@ -169,6 +170,23 @@ void bfs_tdbu(
         vertex_t INFTY
 ){
 
+    vertex_t prev_fq_sz = 0;
+    vertex_t curr_fq_sz = 0;
+    vertex_t unvisited = (vertex_t) vert_count;
+    double prev_slope = 0.0;
+    double curr_slope = 0.0; // slope (variation)
+    double curr_conv = 0.0; // convexity (tendency)
+    double curr_proc = 0.0; // processed (progress)
+    double remn_proc = 0.0;
+
+    double neuron_input[6];
+    neuron_input[0] = avg_deg;
+    neuron_input[1] = prob_high;
+    bool label = false;
+
+    double t_st_pred;
+    t_pred = 0.0;
+
     bool fq_swap = true;
     bool reversed = false;
     bool TD_BU = false; // true: bottom-up, false: top-down
@@ -177,7 +195,32 @@ void bfs_tdbu(
 
     for(level = 0; ; level++){
 
-        if(*fq_sz_h < (vertex_t) (par_alpha * vert_count)){
+        if(level != 0){
+
+            t_st_pred = wtime();
+
+            prev_fq_sz = curr_fq_sz;
+            prev_slope = curr_slope;
+
+            curr_fq_sz = *fq_sz_h;
+            curr_slope = (double) (curr_fq_sz - prev_fq_sz) / vert_count;
+            curr_conv = curr_slope - prev_slope;
+
+            unvisited -= curr_fq_sz;
+            curr_proc = (double) curr_fq_sz / vert_count;
+            remn_proc = (double) unvisited / vert_count;
+
+            neuron_input[2] = curr_slope;
+            neuron_input[3] = curr_conv;
+            neuron_input[4] = curr_proc;
+            neuron_input[5] = remn_proc;
+
+            label = predict(neuron_input);
+
+            t_pred += (wtime() - t_st_pred);
+        }
+
+        if(!label){
 
             if(TD_BU)
                 reversed = true;
@@ -188,7 +231,7 @@ void bfs_tdbu(
         else
             TD_BU = true;
 
-
+        std::cout << TD_BU << std::endl;
         if(!TD_BU){
 
             if(!fq_swap)
@@ -364,6 +407,8 @@ int bfs( // breadth-first search on GPU
         vertex_t INFTY
 ){
 
+    init_model();
+
     srand((unsigned int) wtime());
     int retry = 0;
 
@@ -424,10 +469,10 @@ int bfs( // breadth-first search on GPU
     depth_t level;
     double avg_prob_high = 0.0;
     double avg_depth = 0.0;
-    double avg_par_alpha = 0.0;
     double avg_par_beta = 0.0;
     double t_st, t_end, t_elpd, avg_t; // time_start, time_end, time_elapsed
     double t_par_st, t_par_end, t_par_elpd, avg_t_par; // time_calc_par_opt_start, time_calc_par_opt_end, time_calc_par_opt_elapsed
+    double t_pred_avg = 0.0;
     double avg_gteps = 0.0; // average_teps (traversed edges per second)
     double curr_gteps; // current_teps
 
@@ -545,18 +590,19 @@ int bfs( // breadth-first search on GPU
         avg_prob_high += prob_high;
         avg_depth += level;
         if(verbose){
-            avg_par_alpha += par_alpha;
             avg_par_beta += par_beta;
         }
         t_elpd = t_end - t_st;
         avg_t += t_elpd;
         t_par_elpd = (t_par_end - t_par_st) * 1000000.0;
         avg_t_par += t_par_elpd;
+        t_pred *= 1000000.0;
+        t_pred_avg += t_pred;
         curr_gteps = (double) (tr_edge / t_elpd) / 1000000000;
         avg_gteps += curr_gteps;
         std::cout << "The probability of high-degree vertex: " << prob_high << std::endl;
         std::cout << "Depth: " << level << std::endl;
-        std::cout << "Overhead of direction-optimizer: " << t_par_elpd << "us" << std::endl;
+        std::cout << "Overhead of direction-optimizer: " << t_pred + t_par_elpd << "us (pred: " << t_pred << "us, par: " << t_par_elpd << "us)" << std::endl;
         std::cout << "Consumed time: " << t_elpd << "s" << std::endl;
         std::cout << "Current GTEPS: " << curr_gteps << std::endl;
     }
@@ -564,6 +610,7 @@ int bfs( // breadth-first search on GPU
     avg_prob_high /= NUM_ITER;
     avg_depth /= NUM_ITER;
     avg_t_par /= NUM_ITER;
+    t_pred_avg /= NUM_ITER;
     avg_t /= NUM_ITER;
     avg_gteps /= NUM_ITER;
     std::cout << "===================================================================" << std::endl;
@@ -572,7 +619,7 @@ int bfs( // breadth-first search on GPU
     std::cout << "Average degree: " << avg_deg << std::endl;
     std::cout << "Average probability of high-degree vertex: " << avg_prob_high << std::endl;
     std::cout << "Average depth: " << avg_depth << std::endl;
-    std::cout << "Average overhead of direction-optimizer: " << avg_t_par << "us" << std::endl;
+    std::cout << "Average overhead of direction-optimizer: " << t_pred_avg + avg_t_par << "us (pred: " << t_pred_avg << "us, par: " << avg_t_par << "us)" << std::endl;
     std::cout << "Average consumed time: " << avg_t << "s" << std::endl;
     std::cout << "Average GTEPS: " << avg_gteps << std::endl;
     std::cout << "===================================================================" << std::endl;
@@ -593,7 +640,6 @@ int bfs( // breadth-first search on GPU
         t_wcfp_large = t_fqg_bu_wcsac + t_fqg_rev_tcfe;
         t_wcfp_total = t_wcfp_small + t_wcfp_medium + t_wcfp_large;
 
-        avg_par_alpha /= NUM_ITER;
         avg_par_beta /= NUM_ITER;
 
         std::cout << "Breakdown of kernel execution of frontier processing techniques" << std::endl;
@@ -611,8 +657,7 @@ int bfs( // breadth-first search on GPU
         std::cout << "Top-down: " << t_wcfp_small + t_wcfp_medium << "us (" << (t_wcfp_small + t_wcfp_medium) * 100 / t_wcfp_total << "%)" << std::endl;
         std::cout << "Bottom-up: " << t_wcfp_large << "us (" << t_wcfp_large * 100 / t_wcfp_total << "%)" << std::endl;
         std::cout << "===================================================================" << std::endl;
-        std::cout << "Parameters (average)" << std::endl;
-        std::cout << "alpha: " << avg_par_alpha << std::endl;
+        std::cout << "Parameter (average)" << std::endl;
         std::cout << "beta: " << avg_par_beta << std::endl;
         std::cout << "===================================================================" << std::endl;
     }
