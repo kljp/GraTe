@@ -518,7 +518,7 @@ void bfs_tdbu(
         }
 
         curr_fq_sz = *fq_sz_h;
-        curr_slope = (double) (curr_fq_sz - prev_fq_sz) / vert_count;
+        curr_slope = ((double) curr_fq_sz - prev_fq_sz) / vert_count;
         curr_conv = curr_slope - prev_slope;
 
         unvisited -= curr_fq_sz;
