@@ -87,65 +87,65 @@ inline bool predict(const double *neuron_input){
 
 void init_model(){
 
-    weight_input_hidden[0][0] = -1.117256641387939453e+00;
-    weight_input_hidden[0][1] = -1.658650040626525879e+00;
-    weight_input_hidden[0][2] = 2.487315796315670013e-02;
-    weight_input_hidden[0][3] = -1.259038448333740234e+00;
-    weight_input_hidden[0][4] = -3.185095498338341713e-03;
-    weight_input_hidden[0][5] = -5.573866143822669983e-02;
+    weight_input_hidden[0][0] = -2.303028013557195663e-03;
+    weight_input_hidden[0][1] = 4.044337198138237000e-02;
+    weight_input_hidden[0][2] = -4.462619423866271973e-01;
+    weight_input_hidden[0][3] = -4.787955880165100098e-01;
+    weight_input_hidden[0][4] = -6.824228763580322266e-01;
+    weight_input_hidden[0][5] = -2.554011642932891846e-01;
 
-    weight_input_hidden[1][0] = -2.531924247741699219e+00;
-    weight_input_hidden[1][1] = 5.253770828247070312e+00;
-    weight_input_hidden[1][2] = 6.235598564147949219e+00;
-    weight_input_hidden[1][3] = 1.798212127685546875e+02;
-    weight_input_hidden[1][4] = -3.473807525634765625e+01;
-    weight_input_hidden[1][5] = 2.896977043151855469e+01;
+    weight_input_hidden[1][0] = 2.062148094177246094e+00;
+    weight_input_hidden[1][1] = 1.009470748901367188e+01;
+    weight_input_hidden[1][2] = -1.551159024238586426e-01;
+    weight_input_hidden[1][3] = 2.363148331642150879e-01;
+    weight_input_hidden[1][4] = -4.725298881530761719e-01;
+    weight_input_hidden[1][5] = 9.805077314376831055e-02;
 
-    weight_input_hidden[2][0] = -5.582130551338195801e-01;
-    weight_input_hidden[2][1] = -2.775382614135742188e+01;
-    weight_input_hidden[2][2] = -2.580341491699218750e+02;
-    weight_input_hidden[2][3] = -3.489633277058601379e-02;
-    weight_input_hidden[2][4] = -4.019395262002944946e-02;
-    weight_input_hidden[2][5] = -3.902198076248168945e-01;
+    weight_input_hidden[2][0] = -1.033092117309570312e+01;
+    weight_input_hidden[2][1] = -1.216687965393066406e+01;
+    weight_input_hidden[2][2] = 4.356395602226257324e-01;
+    weight_input_hidden[2][3] = 1.415770053863525391e-01;
+    weight_input_hidden[2][4] = 5.835133194923400879e-01;
+    weight_input_hidden[2][5] = -2.011589705944061279e-01;
 
-    weight_input_hidden[3][0] = 2.706017345190048218e-03;
-    weight_input_hidden[3][1] = 2.391710281372070312e+01;
-    weight_input_hidden[3][2] = 2.072065509855747223e-02;
-    weight_input_hidden[3][3] = 2.006917260587215424e-02;
-    weight_input_hidden[3][4] = 2.253496274352073669e-02;
-    weight_input_hidden[3][5] = 2.382176816463470459e-01;
+    weight_input_hidden[3][0] = 1.322073340415954590e+00;
+    weight_input_hidden[3][1] = 6.962181568145751953e+00;
+    weight_input_hidden[3][2] = -4.583228826522827148e-01;
+    weight_input_hidden[3][3] = 2.352800369262695312e-01;
+    weight_input_hidden[3][4] = 4.106130003929138184e-01;
+    weight_input_hidden[3][5] = -3.548008203506469727e-01;
 
-    weight_input_hidden[4][0] = -9.260103106498718262e-01;
-    weight_input_hidden[4][1] = -4.923905944824218750e+01;
-    weight_input_hidden[4][2] = -3.456246643066406250e+02;
-    weight_input_hidden[4][3] = -3.961721801757812500e+02;
-    weight_input_hidden[4][4] = 1.501199722290039062e+01;
-    weight_input_hidden[4][5] = -2.033208274841308594e+01;
+    weight_input_hidden[4][0] = 7.143101501464843750e+01;
+    weight_input_hidden[4][1] = 2.645717811584472656e+01;
+    weight_input_hidden[4][2] = 7.732397317886352539e-02;
+    weight_input_hidden[4][3] = -1.423445940017700195e-01;
+    weight_input_hidden[4][4] = -5.740886330604553223e-01;
+    weight_input_hidden[4][5] = -2.131928130984306335e-02;
 
-    weight_input_hidden[5][0] = -2.269636154174804688e+00;
-    weight_input_hidden[5][1] = 2.715357065200805664e+00;
-    weight_input_hidden[5][2] = -5.181360244750976562e-01;
-    weight_input_hidden[5][3] = 9.664932250976562500e+00;
-    weight_input_hidden[5][4] = -3.988323211669921875e+01;
-    weight_input_hidden[5][5] = -1.257931423187255859e+01;
-
-
-    bias_hidden[0] = -2.284490108489990234e+00;
-    bias_hidden[1] = 3.628284931182861328e+00;
-    bias_hidden[2] = 1.127725481986999512e+00;
-    bias_hidden[3] = 1.811111602783203125e+02;
-    bias_hidden[4] = -2.854812240600585938e+01;
-    bias_hidden[5] = 1.841198158264160156e+01;
+    weight_input_hidden[5][0] = 6.917166233062744141e+00;
+    weight_input_hidden[5][1] = -6.894137573242187500e+01;
+    weight_input_hidden[5][2] = -5.916026830673217773e-01;
+    weight_input_hidden[5][3] = 4.553381800651550293e-01;
+    weight_input_hidden[5][4] = -2.932451367378234863e-01;
+    weight_input_hidden[5][5] = 2.833680249750614166e-02;
 
 
-    weight_hidden_output[0] = 5.056270956993103027e-01;
-    weight_hidden_output[1] = -6.831505775451660156e+00;
-    weight_hidden_output[2] = -8.631275892257690430e-01;
-    weight_hidden_output[3] = -2.654483355581760406e-02;
-    weight_hidden_output[4] = -2.393820555880665779e-03;
-    weight_hidden_output[5] = 2.813248634338378906e-01;
+    bias_hidden[0] = -1.921773552894592285e-01;
+    bias_hidden[1] = -2.072150468826293945e+00;
+    bias_hidden[2] = 0.000000000000000000e+00;
+    bias_hidden[3] = 0.000000000000000000e+00;
+    bias_hidden[4] = 0.000000000000000000e+00;
+    bias_hidden[5] = -3.121882677078247070e-02;
 
-    bias_output = 1.628709435462951660e+00;
+
+    weight_hidden_output[0] = 1.954106390476226807e-01;
+    weight_hidden_output[1] = 7.156560420989990234e-01;
+    weight_hidden_output[2] = 5.420844554901123047e-01;
+    weight_hidden_output[3] = -2.381692528724670410e-01;
+    weight_hidden_output[4] = -8.286997079849243164e-01;
+    weight_hidden_output[5] = 1.751225255429744720e-02;
+
+    bias_output = -3.250087976455688477e+00;
 }
 
 #endif //__H_MODEL__
