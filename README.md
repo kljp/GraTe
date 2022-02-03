@@ -1,6 +1,8 @@
 # SURF
-## BFS Direction-Optimizer utilizing tendency of workload on GPUs
+## BFS Direction-Optimizer utilizing workload state of frontiers on GPUs.
 ---
+SURF is abbreviation of 'switching direction upon recent workload state'.
+
 This project aims to support a high performance breadth-first graph traversal on GPUs.
 
 ---
@@ -26,13 +28,30 @@ make
 ---
 Execute
 -----
-TBD
+./surf --csr \<\*_beg_pos.bin\> \<\*_adj_list.bin\> \[option1\] \[option2\]
+- \[option1\]: --verylarge
+    - set data type of vertices and edges to 'unsigned long long', default='unsigned int'
+- \[option2\]: --verbose
+    - print breakdown of frontier processing techniques
 
 ---
 Code specification
 -----
 __SURF implementation:__
-TBD
+- main.cu: load a graph as an input
+- bfs.cuh: traverse the graph
+- model.h: initialize a trained MLP model and predict a label of direction
+- fqg.cuh: implementation of traversals of top-down and bottom-up
+- mcpy.cuh: functions for initializing data structures
+- alloc.cuh: memory allocation for data structures
+- comm.cuh: global variables and functions shared by all files
+
+__Auto labeler:__
+- bfs_al.cu: generate train data as auto-labeled records
+    - Compile: make
+    - Execute: ./aula --csr \<\*_beg_pos.bin\> \<\*_adj_list.bin\> --data \<train_data\> \[option1\]
+      - \[option1\]: --verylarge
+        - set data type of vertices and edges to 'unsigned long long', default='unsigned int'
 
 __CSR Generator provided by https://github.com/kljp/vCSR/:__
 - vcsr.cpp: generate CSR
