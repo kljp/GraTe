@@ -1,4 +1,4 @@
-# GraTe
+# SURF
 ## BFS Direction-Optimizer utilizing tendency of workload on GPUs
 ---
 This project aims to support a high performance breadth-first graph traversal on GPUs.
@@ -31,7 +31,7 @@ TBD
 ---
 Code specification
 -----
-__GraTe implementation:__
+__SURF implementation:__
 TBD
 
 __CSR Generator provided by https://github.com/kljp/vCSR/:__
