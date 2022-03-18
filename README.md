@@ -41,7 +41,7 @@ __SURF implementation:__
 - main.cu: load a graph as an input
 - bfs.cuh: traverse the graph
 - model.h: initialize a trained MLP model and predict a label of direction
-- fqg.cuh: implementation of traversals of top-down and bottom-up
+- fqg.cuh: implementation of push and pull phases
 - mcpy.cuh: functions for initializing data structures
 - alloc.cuh: memory allocation for data structures
 - comm.cuh: global variables and functions shared by all files
@@ -57,7 +57,7 @@ __CSR Generator provided by https://github.com/kljp/vCSR/:__
 - vcsr.cpp: generate CSR
     - Compile: make
     - Execute: ./vcsr --input \<\*.mtx\> \[option1\] \[option2\] \[option3\] \[option4\]
-      - \[option1\]: --virtual \<max\_degree\> \(not available for FADO\)
+      - \[option1\]: --virtual \<max\_degree\> \(not available for SURF\)
         - set maximum degree of a vertex to \<max\_degree\>
       - \[option2\]: --undirected
         - add reverse edges
