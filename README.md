@@ -72,6 +72,12 @@ __Headers Provided by https://github.com/iHeartGraph/Enterprise/:__
 - graph.h: graph data structure
 - graph.hpp: implementation of graph data structure
 - wtime.h: get current time for measuring the consumed time
+
+---
+Publication
+-----
+Daegun Yoon, Sangyoon Oh, **SURF: Direction-Optimizing Breadth-First Search Using Workload State on GPUs**, *Sensors*, Jun. 2022. [**\[Paper\]**](https://www.mdpi.com/1424-8220/22/13/4899)
+
 ---
 Contact
 -----
