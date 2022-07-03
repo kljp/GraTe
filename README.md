@@ -76,7 +76,7 @@ __Headers Provided by https://github.com/iHeartGraph/Enterprise/:__
 ---
 Publication
 -----
-Daegun Yoon, Sangyoon Oh, **SURF: Direction-Optimizing Breadth-First Search Using Workload State on GPUs**, *Sensors*, Jun. 2022. [**\[Paper\]**](https://www.mdpi.com/1424-8220/22/13/4899)
+**SURF: Direction-Optimizing Breadth-First Search Using Workload State on GPUs**. Daegun Yoon, Sangyoon Oh. ***Sensors***, Jun. 2022. [**\[Paper\]**](https://www.mdpi.com/1424-8220/22/13/4899)
 
 ---
 Contact
